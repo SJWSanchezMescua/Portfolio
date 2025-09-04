@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { db, auth } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase"; // 'storage' ya no es necesario
 import {
   collection,
   addDoc,
@@ -14,10 +14,11 @@ import { useRouter } from "next/navigation";
 export default function AdminPage() {
   const [projects, setProjects] = useState([]);
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState(""); // Nuevos estados para la URL de la imagen y del proyecto
+  const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [projectUrl, setProjectUrl] = useState("");
-  const router = useRouter(); // cargar proyectos
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -27,27 +28,44 @@ export default function AdminPage() {
       );
     };
     fetchProjects();
-  }, []); // añadir proyecto
+  }, []);
 
   const addProject = async (e) => {
-    e.preventDefault(); // Agregamos los nuevos campos a Firestore
-    await addDoc(collection(db, "projects"), {
-      title,
-      description,
-      imageUrl,
-      projectUrl,
-    });
-    setTitle("");
-    setDescription("");
-    setImageUrl("");
-    setProjectUrl("");
-    router.refresh(); // refresca datos
-  }; // borrar proyecto
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await addDoc(collection(db, "projects"), {
+        title,
+        description,
+        imageUrl, // Usamos la URL directamente
+        projectUrl,
+      });
+
+      // Limpiar los campos después de la subida
+      setTitle("");
+      setDescription("");
+      setImageUrl("");
+      setProjectUrl("");
+      setLoading(false);
+      router.refresh();
+    } catch (err) {
+      console.error("Error al agregar el proyecto:", err);
+      setLoading(false);
+    }
+  };
 
   const deleteProject = async (id) => {
-    await deleteDoc(doc(db, "projects", id));
-    router.refresh();
-  }; // logout
+    try {
+        await deleteDoc(doc(db, "projects", id));
+
+        // Actualiza el estado para eliminar el proyecto
+        setProjects(projects.filter(project => project.id !== id));
+        
+    } catch (error) {
+        console.error("Error al eliminar el proyecto:", error);
+    }
+};
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -55,104 +73,106 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-t from-[#c09c0e] to-[#1a1a1a] text-white p-6">
-            <h1 className="text-3xl font-bold mb-6">Panel de Administración</h1>
-           {" "}
-      <form onSubmit={addProject} className="bg-black/50 p-4 rounded mb-6">
-               {" "}
-        <input
-          type="text"
-          placeholder="Título del proyecto"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full p-2 mb-2 text-black rounded"
-        />
-               {" "}
-        <textarea
-          placeholder="Descripción breve"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="w-full p-2 mb-2 text-black rounded"
-        />
-               {" "}
-        <input
-          type="text"
-          placeholder="URL de la imagen (ej: de Imgur, Cloudinary, etc.)"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          className="w-full p-2 mb-2 text-black rounded"
-        />
-               {" "}
-        <input
-          type="text"
-          placeholder="URL del proyecto (ej: a tu sitio web, GitHub, Behance)"
-          value={projectUrl}
-          onChange={(e) => setProjectUrl(e.target.value)}
-          className="w-full p-2 mb-2 text-black rounded"
-        />
-               {" "}
-        <button
-          type="submit"
-          className="w-full bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded"
-        >
-                    Agregar Proyecto        {" "}
-        </button>
-             {" "}
-      </form>
-           {" "}
-      <ul>
-               {" "}
-        {projects.map((project) => (
-          <li
-            key={project.id}
-            className="flex flex-col sm:flex-row justify-between bg-black/40 p-3 mb-2 rounded"
-          >
-                       {" "}
-            <div className="mb-2 sm:mb-0">
-                            <h2 className="font-bold">{project.title}</h2>     
-                      <p>{project.description}</p>
-              <p className="text-sm text-gray-400">
-                URL Imagen:{" "}
-                <a
-                  href={project.imageUrl}
-                  target="_blank"
-                  className="underline"
-                >
-                  {project.imageUrl}
-                </a>
-              </p>
-              <p className="text-sm text-gray-400">
-                URL Proyecto:{" "}
-                <a
-                  href={project.projectUrl}
-                  target="_blank"
-                  className="underline"
-                >
-                  {project.projectUrl}
-                </a>
-              </p>
-                         {" "}
-            </div>
-                       {" "}
+    <div className="min-h-screen bg-gradient-to-t from-[#001f3f] to-[#1a1a1a] text-white p-6">
+      <div className="flex flex-col md:flex-row gap-6 max-w-7xl mx-auto">
+        {/* Panel de Controles (Columna Izquierda) */}
+        <aside className="w-full md:w-1/3 p-6 bg-black/50 rounded-lg shadow-lg">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-xl font-bold text-[#7FDBFF]">Panel de Control</h1>
             <button
-              onClick={() => deleteProject(project.id)}
-              className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded self-end sm:self-center"
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm font-bold"
             >
-                            Eliminar            {" "}
+              Cerrar Sesión
             </button>
-                     {" "}
-          </li>
-        ))}
-             {" "}
-      </ul>
-           {" "}
-      <button
-        onClick={handleLogout}
-        className="mt-6 bg-red-600 hover:bg-red-700 px-4 py-2 rounded"
-      >
-                Cerrar Sesión      {" "}
-      </button>
-         {" "}
+          </div>
+
+          <h2 className="text-lg font-semibold text-gray-200 mb-4 border-b border-gray-700 pb-2">
+            Agregar Nuevo Proyecto
+          </h2>
+          <form onSubmit={addProject} className="flex flex-col gap-4">
+            <input
+              type="text"
+              placeholder="Título del proyecto"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full p-2 text-white bg-gray-800 border border-gray-700 rounded focus:outline-none focus:border-[#7FDBFF]"
+            />
+            <textarea
+              placeholder="Descripción breve"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full p-2 text-white bg-gray-800 border border-gray-700 rounded focus:outline-none focus:border-[#7FDBFF]"
+            />
+            
+            {/* Solo queda el campo de la URL */}
+            <input
+              type="text"
+              placeholder="URL de la imagen"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              className="w-full p-2 text-white bg-gray-800 border border-gray-700 rounded focus:outline-none focus:border-[#7FDBFF]"
+            />
+
+            <input
+              type="text"
+              placeholder="URL del proyecto"
+              value={projectUrl}
+              onChange={(e) => setProjectUrl(e.target.value)}
+              className="w-full p-2 text-white bg-gray-800 border border-gray-700 rounded focus:outline-none focus:border-[#7FDBFF]"
+            />
+            <button
+              type="submit"
+              className="w-full bg-[#7FDBFF] hover:bg-[#B3E5FC] text-black px-4 py-2 rounded font-bold transition"
+              disabled={loading}
+            >
+              {loading ? "Subiendo..." : "Agregar Proyecto"}
+            </button>
+          </form>
+        </aside>
+
+        {/* Sección de Lista de Proyectos (Columna Derecha) */}
+        <main className="w-full md:w-2/3 p-6 bg-black/50 rounded-lg shadow-lg">
+          <h2 className="text-xl font-bold text-[#7FDBFF] mb-4">
+            Proyectos Publicados
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className="bg-black/40 rounded-lg shadow-md border border-gray-700 p-4 flex flex-col justify-between hover:border-[#7FDBFF] transition-colors"
+              >
+                <div>
+                  {project.imageUrl && (
+                    <img
+                      src={project.imageUrl}
+                      alt={project.title}
+                      className="w-full h-32 object-cover rounded-md mb-3"
+                    />
+                  )}
+                  <h3 className="font-bold text-[#7FDBFF] mb-1">{project.title}</h3>
+                  <p className="text-sm text-gray-300">{project.description}</p>
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                  <a
+                    href={project.projectUrl}
+                    target="_blank"
+                    className="text-sm text-gray-400 hover:text-white underline"
+                  >
+                    Ver proyecto
+                  </a>
+                  <button
+                    onClick={() => deleteProject(project.id)}
+                    className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-bold"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
